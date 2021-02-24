@@ -29,7 +29,7 @@ class AVRG(Optimizer):
         """
         self.N = n
         for p, q in zip(self.old_g, self.new_g):
-            p.copy_(q)
+            p.data.copy_(q.data)
             q.zero_()
 
     def step(self, params):
@@ -64,5 +64,5 @@ class AVRG_0(Optimizer):
         """
         for group, new_group in zip(self.param_groups, new_params): 
             for p, q in zip(group['params'], new_group['params']):
-                  p.data.copy_(q.data)
+                p.data.copy_(q.data)
 

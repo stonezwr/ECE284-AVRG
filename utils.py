@@ -6,9 +6,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def MNIST_dataset():
-    if not os.path.isdir("data"):
-        os.mkdir("data")
-    # Download MNIST dataset and set the valset as the test test
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,)),
@@ -18,9 +15,6 @@ def MNIST_dataset():
     return train_set, test_set
 
 def CIFAR10_dataset():
-    if not os.path.isdir("data"):
-        os.mkdir("data")
-    # Download MNIST dataset and set the valset as the test test
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
