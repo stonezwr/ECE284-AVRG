@@ -10,7 +10,7 @@ import logging
 import sys
 
 from svrg import SVRG, SVRG_0
-from avrg import AVRG
+from avrg import AVRG, AVRG_0
 from utils import MNIST_dataset, CIFAR10_dataset, MNIST_two_layers, CIFAR10_ConvNet
 
 parser = argparse.ArgumentParser(description="Train SVRG/AVRG.")
@@ -31,23 +31,28 @@ parser.add_argument('--gpu', type=int, default=0,
 parser.add_argument('--seed', type=int, default=3, 
         help='set seed (default: 3).')
 
-def train_SVRG(model_i, model_0, optimizer_i, optimizer_0, train_loader, loss_fn):
+def train_VRG(model_i, model_0, optimizer_i, optimizer_0, train_loader, loss_fn, optimizer_type):
     model.train()
     correct = 0
     total = 0
     total_loss = 0
 
-    # outer loop 
-    optimizer_0.zero_grad()  
-    for inputs, labels in train_loader:
-        inputs = inputs.cuda()
-        labels = labels.cuda()
-        outputs = model_0(inputs)
-        outer_loss = loss_fn(outputs, labels) / len(train_loader) 
-        outer_loss.backward()
+    if optimizer_type == 'SVRG': 
+        # outer loop 
+        optimizer_0.zero_grad()  
+        for inputs, labels in train_loader:
+            inputs = inputs.cuda()
+            labels = labels.cuda()
+            outputs = model_0(inputs)
+            outer_loss = loss_fn(outputs, labels) / len(train_loader) 
+            outer_loss.backward()
 
-    # pass the current paramesters of optimizer_0 to optimizer_i
-    optimizer_i.set_outer_params(optimizer_0.get_param_groups())
+        # pass the current paramesters of optimizer_0 to optimizer_i
+        optimizer_i.set_outer_params(optimizer_0.get_param_groups())
+    elif optimizer_type == 'AVRG':
+        optimizer_i.update_g(len(train_loader))
+    else:
+        raise ValueError("Unknown optimizer")
 
     # inner loop
     for inputs, labels in train_loader:
@@ -178,7 +183,7 @@ if __name__ == "__main__":
 
     # The network
     model = NN_model().cuda()
-    if args.optimizer == 'SVRG':
+    if args.optimizer in ['SVRG', 'AVRG']:
         model_0 = NN_model().cuda()
 
     lr = args.lr  # learning rate
@@ -198,6 +203,7 @@ if __name__ == "__main__":
         optimizer_0 = SVRG_0(model_0.parameters())
     elif args.optimizer == "AVRG":
         optimizer = AVRG(model.parameters(), lr=lr, weight_decay=args.weight_decay)
+        optimizer_0 = AVRG_0(model_0.parameters())
     else:
         raise ValueError("Unknown optimizer")
 
@@ -207,8 +213,8 @@ if __name__ == "__main__":
         t0 = time.time()
 
         # training 
-        if args.optimizer == "SVRG":
-            train_loss, train_acc = train_SVRG(model, model_0, optimizer, optimizer_0, train_loader, loss_fn)
+        if args.optimizer in ['SVRG', 'AVRG']:
+            train_loss, train_acc = train_VRG(model, model_0, optimizer, optimizer_0, train_loader, loss_fn, args.optimizer)
         else:
             train_loss, train_acc = train(model, optimizer, train_loader, loss_fn)
         

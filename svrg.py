@@ -15,7 +15,7 @@ class SVRG(Optimizer):
         super(SVRG, self).__init__(params, defaults)
     
     def get_param_groups(self):
-            return self.param_groups
+        return self.param_groups
 
     def set_outer_params(self, new_j):
         """Set the mean gradient for the current epoch. 
@@ -40,8 +40,8 @@ class SVRG(Optimizer):
                 # core SVRG gradient update 
                 new_d = q_i.grad.data - q_0.grad.data + j_0.grad.data
                 if weight_decay != 0:
-                    new_d.add_(weight_decay, q_i.data)
-                q_i.data.add_(-q_i_group['lr'], new_d)
+                    new_d.add_(q_i.data, alpha=weight_decay)
+                q_i.data.add_(new_d, alpha=-q_i_group['lr'] )
 
 
 class SVRG_0(Optimizer):
@@ -50,12 +50,12 @@ class SVRG_0(Optimizer):
         super(SVRG_0, self).__init__(params, defaults)
       
     def get_param_groups(self):
-            return self.param_groups
+        return self.param_groups
     
     def set_param_groups(self, new_params):
         """Copies the parameters from another optimizer. 
         """
         for group, new_group in zip(self.param_groups, new_params): 
             for p, q in zip(group['params'], new_group['params']):
-                  p.data[:] = q.data[:]
+                  p.data.copy_(q.data)
 
