@@ -30,12 +30,30 @@ parser.add_argument('--gpu', type=int, default=0,
         help='GPU device to use (default: 0).')
 parser.add_argument('--seed', type=int, default=3, 
         help='set seed (default: 3).')
+parser.add_argument('--full_class', action='store_true', 
+        help='full classification/binary classification (default: False).')
+
+def loss_f(outputs, labels, weights, N):
+    loss = 0
+    labels[labels==0] = -1 
+    for w in weights:
+        loss += torch.sum(w**2) / (2 * N)
+
+    loss += torch.sum(torch.log(1+torch.exp(-labels * outputs.view(-1))))/len(labels)
+    return loss
+
+def get_binary_indices(dataset, class_names):
+    indices = []
+    for i in range(len(dataset.targets)):
+        if dataset.targets[i] in class_names:
+            indices.append(i)
+    return indices
 
 def train_VRG(model_i, model_0, optimizer_i, optimizer_0, train_loader, loss_fn, optimizer_type):
     model.train()
-    correct = 0
-    total = 0
     total_loss = 0
+    total = 0
+    N = len(train_loader)
 
     if optimizer_type == 'SVRG': 
         # outer loop 
@@ -44,10 +62,10 @@ def train_VRG(model_i, model_0, optimizer_i, optimizer_0, train_loader, loss_fn,
             inputs = inputs.cuda()
             labels = labels.cuda()
             outputs = model_0(inputs)
-            outer_loss = loss_fn(outputs, labels) / len(train_loader) 
+            outer_loss = loss_f(outputs, labels, optimizer_0.get_param_groups()[0]['params'], N) / N 
             outer_loss.backward()
 
-        # pass the current paramesters of optimizer_0 to optimizer_i
+        # pass the current parameters of optimizer_0 to optimizer_i
         optimizer_i.set_outer_params(optimizer_0.get_param_groups())
     elif optimizer_type == 'AVRG':
         optimizer_i.update_g(len(train_loader))
@@ -60,89 +78,79 @@ def train_VRG(model_i, model_0, optimizer_i, optimizer_0, train_loader, loss_fn,
         labels = labels.cuda()
         
         outputs_i = model_i(inputs)
-        loss_i = loss_fn(outputs_i, labels)
-
+        loss_i = loss_f(outputs_i, labels, optimizer_i.get_param_groups()[0]['params'], N)
         optimizer_i.zero_grad()  
         loss_i.backward()
 
         outputs_0 = model_0(inputs)
-        loss_0 = loss_fn(outputs_0, labels)
+        loss_0 = loss_f(outputs_0, labels, optimizer_0.get_param_groups()[0]['params'], N)
 
         optimizer_0.zero_grad()
         loss_0.backward()
 
         optimizer_i.step(optimizer_0.get_param_groups())
 
-        # logging 
-        _, indices = outputs_i.max(1)
-        correct += (indices == labels).sum().data.item()
         total += len(labels)
+
+        # logging 
         total_loss += loss_i
         
-        acc = correct * 100 / float(total)
-        loss_avg = total_loss / float(total)
-        logging.info('| epoch {:3d} | train | {:5d}/{:5d} samples | lr {:.5f} | train_acc {:3.2f}% | train_loss {:.6f}'.format(epoch, total, len(train_loader.dataset), optimizer.param_groups[0]['lr'], acc, loss_avg))
+        logging.info('| epoch {:3d} | train | {:5d}/{:5d} samples | train_loss {:.6f}'.format(epoch, total, len(train_loader.dataset), total_loss))
         print('\033[2A')
     
     # update the outer loop 
     optimizer_0.set_param_groups(optimizer_i.get_param_groups())
 
-    return loss_avg, acc
+    return total_loss/total
 
 def train(model, optimizer, train_loader, loss_fn):
     model.train()
-    correct = 0
-    total = 0
     total_loss = 0
+    total = 0
+    N = len(train_loader)
 
     for inputs, labels in train_loader:
         inputs = inputs.cuda()
         labels = labels.cuda()
         
         outputs = model(inputs)
-        loss = loss_fn(outputs, labels)
+        loss = loss_f(outputs, labels, optimizer.get_param_groups()[0]['params'], N)
 
         optimizer.zero_grad()  
         loss.backward()
         optimizer.step()
-
-        _, indices = outputs.max(1)
-        correct += (indices == labels).sum().data.item()
+        
         total += len(labels)
+
         total_loss += loss
         
-        acc = correct * 100 / float(total)
-        loss_avg = total_loss / float(total)
-        logging.info('| epoch {:3d} | train | {:5d}/{:5d} samples | lr {:.5f} | train_acc {:3.2f}% | train_loss {:.6f}'.format(epoch, total, len(train_loader.dataset), optimizer.param_groups[0]['lr'], acc, loss_avg))
+        logging.info('| epoch {:3d} | train | {:5d}/{:5d} samples | train_loss {:.6f}'.format(epoch, total, len(train_loader.dataset), total_loss))
         print('\033[2A')
     
-    return loss_avg, acc
+    return total_loss/total
 
 
 def test(model, test_loader, loss_fn):
     model.eval()
-    correct = 0
-    total = 0
     total_loss = 0
+    total = 0
+    N = len(train_loader)
 
     for inputs, labels in test_loader:
         inputs = inputs.cuda()
         labels = labels.cuda()
         outputs = model(inputs)
 
-        loss = loss_fn(outputs, labels)
+        loss = loss_f(outputs, labels, optimizer.get_param_groups()[0]['params'], N) 
 
-        _, indices = outputs.max(1)
-        correct += (indices == labels).sum().data.item()
         total += len(labels)
+
         total_loss += loss
         
-        acc = correct * 100 / float(total)
-        loss_avg = total_loss / float(total)
-        logging.info('| epoch {:3d} | test | {:5d}/{:5d} samples| train_acc {:3.2f}% | train_loss {:.6f}'.format(epoch, total, len(test_loader.dataset), acc, loss_avg))
+        logging.info('| epoch {:3d} | test | {:5d}/{:5d} samples| train_loss {:.6f}'.format(epoch, total, len(test_loader.dataset), total_loss))
         print('\033[2A')
     
-    return loss_avg, acc
+    return total_loss/total
 
 if __name__ == "__main__":
     try:
@@ -170,16 +178,20 @@ if __name__ == "__main__":
 
     # load the data
     if args.dataset == "MNIST":
-        train_set, val_set = MNIST_dataset()
+        train_set, test_set = MNIST_dataset()
         NN_model = MNIST_two_layers
     elif args.dataset == "CIFAR10":
-        train_set, val_set = CIFAR10_dataset() 
+        train_set, test_set = CIFAR10_dataset() 
         NN_model = CIFAR10_ConvNet
     else:
         raise ValueError("Unknown dataset")
+
+    if not args.full_class:
+        train_indices = get_binary_indices(train_set, [0, 1])
+        test_indices = get_binary_indices(test_set, [0, 1])
     
-    train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=4)
-    test_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=True, num_workers=4)
+    train_loader = DataLoader(train_set, batch_size=args.batch_size, sampler = torch.utils.data.sampler.SubsetRandomSampler(train_indices), num_workers=4)
+    test_loader = DataLoader(test_set, batch_size=args.batch_size, sampler = torch.utils.data.sampler.SubsetRandomSampler(test_indices), num_workers=4)
 
     # The network
     model = NN_model().cuda()
@@ -207,30 +219,30 @@ if __name__ == "__main__":
     else:
         raise ValueError("Unknown optimizer")
 
-    best_train = 0
-    best_test = 0
+    best_train = 100000
+    best_test = 100000
     for epoch in range(n_epoch):
         t0 = time.time()
 
         # training 
         if args.optimizer in ['SVRG', 'AVRG']:
-            train_loss, train_acc = train_VRG(model, model_0, optimizer, optimizer_0, train_loader, loss_fn, args.optimizer)
+            train_loss = train_VRG(model, model_0, optimizer, optimizer_0, train_loader, loss_fn, args.optimizer)
         else:
-            train_loss, train_acc = train(model, optimizer, train_loader, loss_fn)
+            train_loss= train(model, optimizer, train_loader, loss_fn)
         
-        best_train = max(train_acc, best_train)
+        best_train = min(train_loss, best_train)
 
         logging.info('-' * 96)
-        logging.info('train | end of epoch {:3d} | time: {:5.2f}s | train acc {:3.2f}% ({:3.2f}%) | train loss {:.6f} | '.format(epoch, (time.time() - t0), train_acc, best_train, train_loss))
+        logging.info('train | end of epoch {:3d} | time: {:5.2f}s | train loss {:.11f} ({:.11f}) | '.format(epoch, (time.time() - t0), train_loss, best_train))
         logging.info('-' * 96) 
 
         t0 = time.time()
         # testing 
-        test_loss, test_acc = test(model, test_loader, loss_fn)
+        test_loss = test(model, test_loader, loss_fn)
         
-        best_test = max(test_acc, best_test)
+        best_test = min(test_loss, best_test)
 
         logging.info('-' * 96)
-        logging.info('test | end of epoch {:3d} | time: {:5.2f}s | test acc {:3.2f}% ({:3.2f}%) | test loss {:.6f} | '.format(epoch, (time.time() - t0), test_acc, best_test, test_loss))
+        logging.info('test | end of epoch {:3d} | time: {:5.2f}s | test loss {:.11f} ({:.11f}) | '.format(epoch, (time.time() - t0), test_loss, best_test))
         logging.info('-' * 96)
         

@@ -30,17 +30,12 @@ def CIFAR10_dataset():
 
 def MNIST_two_layers():
     input_size = 784
-    hidden_sizes = [128, 64]
-    output_size = 10
+    hidden_sizes = [100]
 
     model = nn.Sequential(
         nn.Linear(input_size, hidden_sizes[0]),
         nn.ReLU(),
-        nn.Linear(hidden_sizes[0], hidden_sizes[1]),
-        nn.ReLU(),
-        nn.Linear(hidden_sizes[1], output_size),
-        nn.LogSoftmax(dim=1))
-
+        nn.Linear(hidden_sizes[0], 1))
     return model
 
 class CIFAR10_ConvNet(nn.Module):
