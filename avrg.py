@@ -46,7 +46,6 @@ class AVRG(Optimizer):
                     continue
                 if q_0.grad is None:
                     continue
-                # core AVRG gradient update 
                 new_d = q_i.grad.data - q_0.grad.data + g_old
                 # if self.weight_decay != 0:
                 #     new_d.add_(q_i.data, alpha=self.weight_decay)

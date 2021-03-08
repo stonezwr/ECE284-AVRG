@@ -9,8 +9,8 @@ import numpy as np
 def get_binary_indices(dataset, class_names):
     indices = []
     count = 0 
-    for i in range(len(dataset.targets)):
-        if dataset.targets[i] in class_names:
+    for i in range(len(dataset)):
+        if dataset.get_dataset().targets[i] in class_names:
             indices.append(i)
             count += 1
     return indices
@@ -42,6 +42,7 @@ def MNIST_two_layers():
 
     return model
 
+
 class CIFAR10_ConvNet(nn.Module):
     def __init__(self):
         super(CIFAR10_ConvNet, self).__init__()
@@ -60,35 +61,28 @@ class CIFAR10_ConvNet(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
-
+    
 
 class Logistic_Regression(torch.nn.Module):
-    def __init__(self, w_star, rho):
-        self.rho = rho
+    def __init__(self, X, y, w_star, N):
+        self.X, self.y = X, y
+        self.rho = 1/N
         self.w_star = torch.from_numpy(w_star).cuda()
         self.w_star = self.w_star.type(torch.float32)
+        self.norm_w_star =  torch.sum(torch.square(self.w_star))
         super(Logistic_Regression, self).__init__()
 
-    def loss(self, y, y_hat):
-        return torch.mean(torch.log(1+torch.exp(-y*y_hat)))
+    def loss(self, inputs, labels, w):
+        return torch.mean(torch.log(1+torch.exp(-labels*inputs.matmul(w.T)))) + self.rho/2 * torch.sum(torch.square(w))
 
-    def ER(self, train_loader, w):
-        with torch.no_grad():
-            xy_star = []
-            xy = []
-            for inputs, labels in train_loader:
-                inputs = inputs.cuda()
-                labels = labels.cuda()
-                labels = (labels-0.5) * 2
-                y_star = F.linear(inputs, self.w_star) 
-                y = F.linear(inputs, w)
-                xy_star.append(y_star*labels)
-                xy.append(y*labels)
-            xy_star = torch.stack(xy_star).view(-1)
-            xy = torch.stack(xy).view(-1)
-            v_star = torch.mean(torch.log(1+torch.exp(-xy_star))) + self.rho / 2 * torch.sum(torch.square(self.w_star)) 
-            v = torch.mean(torch.log(1+torch.exp(-xy))) + self.rho / 2 * torch.sum(torch.square(w)) 
-            ER = v-v_star
-            MSD = torch.sum(torch.square(w - self.w_star)) / torch.sum(torch.square(self.w_star))
-            return MSD, ER 
+    def error_(self, w):
+        msd_ = torch.sum( (w - self.w_star)*(w - self.w_star) ) / self.norm_w_star
+        err_ = self.func_value(w) - self.func_value()
+        return msd_.item(), err_.item() 
+
+    def func_value(self, w_=None):
+        w = self.w_star if w_ is None else w_
+
+        return torch.mean(torch.log(1+torch.exp(-self.X.matmul(w.T)*self.y))) + self.rho/2 * torch.sum(torch.square(w))
+
 
