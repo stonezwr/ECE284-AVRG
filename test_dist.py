@@ -51,6 +51,7 @@ def test(model, test_loader, loss_fn):
 
 parser = argparse.ArgumentParser(description="Train Diffusion AVRG")
 parser.add_argument('--dataset', type=str, default="MNIST",
+        choices=['MNIST','CIFAR10','MNIST_Conv'],
         help="datasets (default: MNIST).")
 parser.add_argument('--n_epoch', type=int, default=100,
         help="number of training iterations (default: 100).")
@@ -87,9 +88,6 @@ kwargs = {"num_workers": 4, "pin_memory": True}
 if args.dataset == "MNIST":
     train_set, test_set = MNIST_dataset_flat_dist(bf.rank())
     NN_model = MNIST_two_layers
-elif args.dataset == "MNIST_LR":
-    train_set, test_set = MNIST_dataset_flat_dist(bf.rank())
-    NN_model = MNIST_logistic_regression
 elif args.dataset == "MNIST_Conv":
     train_set, test_set = MNIST_dataset_dist(bf.rank())
     NN_model = LeNet
@@ -141,10 +139,7 @@ else:
     optimizer_i = DiffAVRG(model_i.parameters(), lr=lr, L=L, communication_type=args.comm)
 
 n_epoch = args.n_epoch  # the number of epochs
-if args.dataset == "MNIST_LR":
-    loss_fn = Logistic_Regression.loss
-else:
-    loss_fn = nn.CrossEntropyLoss()
+loss_fn = nn.CrossEntropyLoss()
 
 res_list = []
 for epoch in range(1,n_epoch+1):
