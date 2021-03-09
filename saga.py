@@ -8,6 +8,7 @@ class SAGA(Optimizer):
         self.weight_decay = 1/N
         self.N = N
         self.lr = lr
+        self.index_record = torch.zeros(N).cuda() 
         if lr < 0.0:
             raise ValueError("Invalid learning rate: {}".format(lr))
         if self.weight_decay < 0.0:
@@ -29,15 +30,16 @@ class SAGA(Optimizer):
     def step(self, ind):
         """Performs a single optimization step.
         """
-        if ind < len(self.last_group):
-            for q_group, a_group, l_group in zip(self.param_groups, self.avg_group, self.last_group[ind]):
+        if self.N == len(self.last_group):
+            last_ind = int(self.index_record[ind].item())
+            for q_group, a_group, l_group in zip(self.param_groups, self.avg_group, self.last_group[last_ind]):
                 for q, a, l in zip(q_group['params'], a_group, l_group):
                     if q.grad is None:
                         continue
 
                     new_d = q.grad.data - l.data + a.data
-                    # if self.weight_decay != 0:
-                    #     new_d.add_(q.data, alpha=self.weight_decay)
+                    if self.weight_decay != 0:
+                        new_d.add_(q.data, alpha=self.weight_decay)
                     a.data = a.data - (l.data-q.grad.data) / self.N
                     l.data.copy_(q.grad.data)
                     q.data.add_(new_d, alpha=-self.lr )
@@ -61,5 +63,6 @@ class SAGA(Optimizer):
                 l_groups.append(l_group)
 
             self.last_group.append(l_groups)
+            self.index_record[ind] = (len(self.last_group) - 1)
 
 
