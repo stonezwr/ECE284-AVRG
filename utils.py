@@ -69,7 +69,8 @@ class Logistic_Regression(torch.nn.Module):
         self.w_star = self.w_star.type(torch.float32)
         super(Logistic_Regression, self).__init__()
 
-    def loss(self, y, y_hat):
+    @staticmethod
+    def loss(y, y_hat):
         return torch.mean(torch.log(1+torch.exp(-y*y_hat)))
 
     def ER(self, train_loader, w):
