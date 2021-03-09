@@ -16,6 +16,7 @@ from saga import SAGA
 from utils import *
 from dataset import *
 from vgg import *
+from lenet import *
 
 import matplotlib.pyplot as plt
 
@@ -201,8 +202,8 @@ def test(model, test_loader, loss_fn):
 
 
 parser = argparse.ArgumentParser(description="Train SVRG/AVRG.")
-parser.add_argument('--dataset', type=str, default="MNIST",
-        help="datasets (default: MNIST).")
+parser.add_argument('--network_type', type=str, default="MLP",
+        help="select network MLP/LeNet (default: MLP).")
 parser.add_argument('--n_epoch', type=int, default=30,
         help="number of training iterations (default: 30).")
 parser.add_argument('--lr', type=float, default=0.005,
@@ -242,14 +243,17 @@ torch.cuda.manual_seed_all(args.seed)
 np.random.seed(args.seed)
 
 # load the data
-if args.dataset == "MNIST":
+if args.network_type == "MLP":
     train_set, test_set = MNIST_dataset_flat(args.batch_size)
     NN_model = MNIST_two_layers
-elif args.dataset == "CIFAR10":
-    train_set, test_set = CIFAR10_dataset(args.batch_size) 
-    NN_model = vgg11
+elif args.network_type == "CNN":
+    train_set, test_set = MNIST_dataset(args.batch_size)
+    NN_model = LeNet
 else:
     raise ValueError("Unknown dataset")
+
+# train_set, test_set = CIFAR10_dataset(args.batch_size) 
+# NN_model = vgg11
 
 train_loader = DataLoader(train_set, batch_size=1, shuffle=True, num_workers=1)
 test_loader = DataLoader(test_set, batch_size=1, shuffle=False, num_workers=1)
@@ -310,12 +314,7 @@ train_loss_list_SAGA = []
 test_acc_list_SAGA = []
 test_loss_list_SAGA = []
 
-for epoch in range(n_epoch+1):
-    # if epoch == 0:
-    #     # first round to get g
-    #     train_AVRG(model_AVRG_0, model_AVRG_1, optimizer_AVRG_0, optimizer_AVRG_1, train_loader, loss_fn)
-    #     continue
-
+for epoch in range(n_epoch):
     # training 
     t0 = time.time()
 

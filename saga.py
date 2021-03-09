@@ -38,8 +38,8 @@ class SAGA(Optimizer):
                         continue
 
                     new_d = q.grad.data - l.data + a.data
-                    # if self.weight_decay != 0:
-                    #     new_d.add_(q.data, alpha=self.weight_decay)
+                    if self.weight_decay != 0:
+                        new_d.add_(q.data, alpha=self.weight_decay)
                     a.data = a.data - (l.data-q.grad.data) / self.N
                     l.data.copy_(q.grad.data)
                     q.data.add_(new_d, alpha=-self.lr )
