@@ -325,6 +325,7 @@ for epoch in range(n_epoch):
     logging.info('train SGD | end of epoch {:3d} | time: {:5.2f}s | train acc {:3.2f}% ({:3.2f}%) | train loss {:.6f} | '.format(epoch, (time.time() - t0), train_acc_SGD, best_train_SGD, train_loss_SGD))
     logging.info('-' * 96) 
 
+    t0 = time.time()
     train_loss_SVRG, train_acc_SVRG = train_SVRG(model_SVRG_0, model_SVRG_1, optimizer_SVRG_0, optimizer_SVRG_1, train_loader, loss_fn)
 
     best_train_SVRG = max(train_acc_SVRG, best_train_SVRG)
@@ -332,6 +333,7 @@ for epoch in range(n_epoch):
     logging.info('train SVRG | end of epoch {:3d} | time: {:5.2f}s | train acc {:3.2f}% ({:3.2f}%) | train loss {:.6f} | '.format(epoch, (time.time() - t0), train_acc_SVRG, best_train_SVRG, train_loss_SVRG))
     logging.info('-' * 96) 
 
+    t0 = time.time()
     train_loss_AVRG, train_acc_AVRG= train_AVRG(model_AVRG_0, model_AVRG_1, optimizer_AVRG_0, optimizer_AVRG_1, train_loader, loss_fn)
 
     best_train_AVRG = max(train_acc_AVRG, best_train_AVRG)
@@ -339,6 +341,7 @@ for epoch in range(n_epoch):
     logging.info('train AVRG | end of epoch {:3d} | time: {:5.2f}s | train acc {:3.2f}% ({:3.2f}%) | train loss {:.6f} | '.format(epoch, (time.time() - t0), train_acc_AVRG, best_train_AVRG, train_loss_AVRG))
     logging.info('-' * 96) 
 
+    t0 = time.time()
     train_loss_SAGA, train_acc_SAGA= train_SAGA(model_SAGA, optimizer_SAGA, train_loader, loss_fn)
 
     best_train_SAGA = max(train_acc_SAGA, best_train_SAGA)
@@ -364,18 +367,21 @@ for epoch in range(n_epoch):
     logging.info('test SGD | end of epoch {:3d} | time: {:5.2f}s | test acc {:3.2f}% ({:3.2f}%) | test loss {:.6f} | '.format(epoch, (time.time() - t0), test_acc_SGD, best_test_SGD, test_loss_SGD))
     logging.info('-' * 96)
     
+    t0 = time.time()
     test_loss_SVRG, test_acc_SVRG = test(model_SVRG_1, test_loader, loss_fn)
     best_test_SVRG = max(test_acc_SVRG, best_test_SVRG)
     logging.info('-' * 96)
     logging.info('test SVRG | end of epoch {:3d} | time: {:5.2f}s | test acc {:3.2f}% ({:3.2f}%) | test loss {:.6f} | '.format(epoch, (time.time() - t0), test_acc_SVRG, best_test_SVRG, test_loss_SVRG))
     logging.info('-' * 96)
     
+    t0 = time.time()
     test_loss_AVRG, test_acc_AVRG = test(model_AVRG_1, test_loader, loss_fn)
     best_test_AVRG = max(test_acc_AVRG, best_test_AVRG)
     logging.info('-' * 96)
     logging.info('test AVRG | end of epoch {:3d} | time: {:5.2f}s | test acc {:3.2f}% ({:3.2f}%) | test loss {:.6f} | '.format(epoch, (time.time() - t0), test_acc_AVRG, best_test_AVRG, test_loss_AVRG))
     logging.info('-' * 96)
     
+    t0 = time.time()
     test_loss_SAGA, test_acc_SAGA = test(model_SAGA, test_loader, loss_fn)
     best_test_SAGA = max(test_acc_SAGA, best_test_SAGA)
     logging.info('-' * 96)
