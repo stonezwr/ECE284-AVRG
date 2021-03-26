@@ -6,6 +6,7 @@ import torch.optim as optim
 import numpy as np
 import argparse
 import copy
+import time
 
 from exact_diff import ExactDiff, train_Exact_Diffusion
 from diff_avrg import DiffAVRG, DiffAVRG_0, train_Diffusion_AVRG
@@ -142,28 +143,38 @@ n_epoch = args.n_epoch  # the number of epochs
 loss_fn = nn.CrossEntropyLoss()
 
 res_list = []
+total_time = 0
 for epoch in range(1,n_epoch+1):
     train_sampler.set_epoch(epoch)
     if args.method == "ExactDiff":
+        t0 = time.time()
         train_Exact_Diffusion(model, optimizer, train_loader, loss_fn)
+        t = time.time()
         train_loss, train_acc = test(model, train_loader, loss_fn)
         test_loss, test_acc = test(model, test_loader, loss_fn)
     elif args.method == "ATC_SGD":
+        t0 = time.time()
         train_ATC_SGD(model, optimizer, train_loader, loss_fn)
+        t = time.time()
         train_loss, train_acc = test(model, train_loader, loss_fn)
         test_loss, test_acc = test(model, test_loader, loss_fn)
     else:
+        t0 = time.time()
         train_Diffusion_AVRG(model_0, model_i, optimizer_0, optimizer_i, train_loader, loss_fn)
+        t = time.time()
         train_loss, train_acc = test(model_i, train_loader, loss_fn)
         test_loss, test_acc = test(model_i, test_loader, loss_fn)
+    total_time += t-t0
     if bf.rank() == 0:
         print(f"{epoch:3d}/{test_loss:.5f}/{test_acc:.2f}%")
     
     res_list.append([epoch, train_loss, test_loss, train_acc, test_acc])
 
+avg_time = total_time/n_epoch
 res_list = bf.allreduce(torch.tensor(res_list))
 
 if bf.rank() == 0:
+    print(f"Avg Time Per Epoch: {avg_time:.2f}s")
     with open(f'{args.method}_{args.save_name}.csv', 'w') as f:
         for res in res_list:
             epoch = res[0]
